@@ -46,7 +46,7 @@ pub struct SynergyHid {
     // Report 1
     keyboard_report: KeyboardReport,
     // Report 2
-    mouse_report: AbsMouseReport,
+    mouse_report: MouseReport,
     // Report 3
     consumer_report: ConsumerReport,
 }
@@ -60,7 +60,7 @@ impl SynergyHid {
             scroll_remainder_x: 0.0,
             scroll_remainder_y: 0.0,
             keyboard_report: KeyboardReport::default(),
-            mouse_report: AbsMouseReport::default(),
+            mouse_report: MouseReport::default(),
             consumer_report: ConsumerReport::default(),
         }
     }
@@ -144,14 +144,14 @@ impl SynergyHid {
         }
     }
 
-    pub fn set_cursor_position<'a>(
+    pub fn mouse_move<'a>(
         &mut self,
-        x: u16,
-        y: u16,
+        dx: i16,
+        dy: i16,
         report: &'a mut [u8],
     ) -> (ReportType, &'a [u8]) {
         report[0] = ReportType::Mouse as u8;
-        report[1..8].copy_from_slice(&self.mouse_report.move_to(x, y));
+        report[1..8].copy_from_slice(&self.mouse_report.mouse_move(dx, dy));
         (ReportType::Mouse, &report[..8])
     }
 
