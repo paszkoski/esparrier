@@ -69,19 +69,12 @@ impl Actuator for UsbActuator {
     }
 
     async fn set_cursor_position(&mut self, x: u16, y: u16) -> Result<(), BarrierError> {
-        // Relative HID mice give no position feedback, so our tracked (x, y) can
-        // desync from the real cursor (pointer gain, missed reports, etc). Every
-        // absolute positioning request (screen entry, or a mid-session warp such
-        // as locked-cursor mode) snaps to the top-left corner first: the OS always
-        // clamps a move at the real screen edge regardless of pointer speed, so
-        // this re-establishes a known baseline before positioning at the target.
-        let mut report = [0; 9];
-        let ret = self.hid.mouse_move(i16::MIN, i16::MIN, &mut report);
-        self.send_report(ret).await;
-
+        let dx = x as i32 - self.x as i32;
+        let dy = y as i32 - self.y as i32;
         self.x = x;
         self.y = y;
-        let ret = self.hid.mouse_move(x as i16, y as i16, &mut report);
+        let mut report = [0; 9];
+        let ret = self.hid.mouse_move(dx as i16, dy as i16, &mut report);
         self.send_report(ret).await;
         Ok(())
     }
@@ -164,6 +157,16 @@ impl Actuator for UsbActuator {
 
     async fn enter(&mut self, x: u16, y: u16, mask: u16) -> Result<(), BarrierError> {
         info!("Entering, x: {x}, y: {y}, mask: {mask:#018b}");
+        // Relative HID mice give no position feedback, so our tracked (x, y) can
+        // desync from the real cursor (acceleration, missed reports, etc). Snap to
+        // the top-left corner first: the OS always clamps a move at the real screen
+        // edge no matter the pointer speed, so this re-establishes a known baseline
+        // before positioning at the actual entry point.
+        let mut report = [0; 9];
+        let ret = self.hid.mouse_move(i16::MIN, i16::MIN, &mut report);
+        self.send_report(ret).await;
+        self.x = 0;
+        self.y = 0;
         self.set_cursor_position(x, y).await?;
         let mut modifiers = [0u16; 16];
         let mods = modifier_mask_to_synergy(mask, &mut modifiers);
